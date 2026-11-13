@@ -93,4 +93,6 @@ export const evaluateRequestSchema = z.object({
 export interface EvaluateResponse {
   model: string;
   answers: Record<string, Answer>;
+  /** Tokens Jev billed for this request, or null when the API did not report them. */
+  inputTokens: number | null;
 }

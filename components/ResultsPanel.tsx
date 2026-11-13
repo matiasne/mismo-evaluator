@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { formatCost, formatDuration } from "@/lib/cost";
 import { SECTIONS, type Answer, type Question, type SectionKey } from "@/lib/questions";
 import { countVerdicts, verdictFor, type Verdict } from "@/lib/verdict";
-import type { Result } from "./Evaluator";
+import type { Result, RunStats } from "./Evaluator";
 
 interface Props {
   questions: Question[];
   disabled: Set<string>;
   results: Record<string, Result>;
   model: string | null;
+  sectionStats: Partial<Record<SectionKey, RunStats>>;
   canRun: boolean;
   onRunSection: (section: SectionKey) => void;
   onToggle: (id: string, enabled: boolean) => void;
@@ -52,7 +54,7 @@ function AnswerLine({ answer }: { answer: Answer }) {
 }
 
 export function ResultsPanel(props: Props) {
-  const { questions, disabled, results, model, canRun } = props;
+  const { questions, disabled, results, model, sectionStats, canRun } = props;
   const [filter, setFilter] = useState<Verdict | "all">("all");
 
   const verdictOf = (question: Question): Verdict | null => {
@@ -91,6 +93,7 @@ export function ResultsPanel(props: Props) {
         if (shown.length === 0) return null;
         const counts = countVerdicts(inSection.flatMap((q) => verdictOf(q) ?? []));
         const busy = inSection.some((q) => results[q.id]?.status === "running");
+        const stats = sectionStats[section.key];
 
         return (
           <section className="panel" key={section.key}>
@@ -110,6 +113,11 @@ export function ResultsPanel(props: Props) {
                 </button>
               </div>
             </div>
+            {stats?.ms != null && !busy && (
+              <p className="muted small">
+                {formatDuration(stats.ms)} · {formatCost(stats.inputTokens)}
+              </p>
+            )}
             <ul className="questions">
               {shown.map((question) => {
                 const result = results[question.id];

@@ -28,6 +28,8 @@ Import the repository in Vercel (or run `vercel`), and set the `TYPESAFE_API_KEY
    - True / false: the probability on the expected side must be at least 80% to pass; 50% to 80% is "review"; lower fails.
    - Choice and score: confidence under 60% is "review"; otherwise the answer is compared with the expected one, if the question has one.
 
+Two blocks under the upload box show how long the last run took and what it cost. Cost is Jev's reported input tokens times the list price in `lib/cost.ts` ($0.042 per million input tokens, output free); update that constant if your pricing differs.
+
 ## Questions
 
 The default questions are in `lib/questions.ts`, grouped by section. In the app you can switch a default off, and add, edit or delete your own. Your questions are saved in your browser (`localStorage`), not on a server, so they do not follow you to another browser.

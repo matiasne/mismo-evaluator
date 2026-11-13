@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { formatDuration, formatTokens, formatUsd } from "@/lib/cost";
 import type { ParseResult } from "@/lib/mismo/parse";
+import type { RunStats } from "./Evaluator";
 
 interface Props {
   fileName: string | null;
   parsed: ParseResult | null;
   error: string | null;
   running: boolean;
+  lastRun: RunStats | null;
   onFile: (name: string, xml: string) => void;
   onError: (message: string) => void;
   onEvaluate: () => void;
@@ -22,7 +25,7 @@ const money = (value: string | null) => {
     : (value ?? "Not stated");
 };
 
-export function UploadPanel({ fileName, parsed, error, running, onFile, onError, onEvaluate }: Props) {
+export function UploadPanel({ fileName, parsed, error, running, lastRun, onFile, onError, onEvaluate }: Props) {
   const [over, setOver] = useState(false);
 
   async function read(file: File | undefined) {
@@ -87,6 +90,25 @@ export function UploadPanel({ fileName, parsed, error, running, onFile, onError,
           The file is not stored. SSNs are masked before the data is sent to Jev.
         </p>
       </section>
+
+      {lastRun && (
+        <div className="stats" aria-live="polite">
+          <section className="panel stat">
+            <h2>Time</h2>
+            <p className="stat-value">{lastRun.ms === null ? "…" : formatDuration(lastRun.ms)}</p>
+            <p className="muted small">{lastRun.ms === null ? "Evaluating" : "Last run"}</p>
+          </section>
+          <section className="panel stat">
+            <h2>Cost</h2>
+            <p className="stat-value">
+              {lastRun.ms === null ? "…" : lastRun.inputTokens === null ? "Not reported" : formatUsd(lastRun.inputTokens)}
+            </p>
+            <p className="muted small">
+              {lastRun.ms === null || lastRun.inputTokens === null ? "Input tokens" : formatTokens(lastRun.inputTokens)}
+            </p>
+          </section>
+        </div>
+      )}
 
       {parsed?.ok && (
         <section className="panel">
