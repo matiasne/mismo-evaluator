@@ -12,7 +12,7 @@ cp .env.example .env.local   # then set TYPESAFE_API_KEY
 npm run dev                  # http://localhost:3000
 ```
 
-"Try the sample" loads `public/samples/sample-urla.xml`, a synthetic file with a few planted defects (a state spelled out, an employer with no name, a liability with no monthly payment, a co-borrower with no declarations, an asset linked to nobody).
+"Try the sample" loads and evaluates `public/samples/sample-urla.xml`, a synthetic file with a few planted defects (a state spelled out, an employer with no name, a liability with no monthly payment, a co-borrower with no declarations, an asset linked to nobody).
 
 ## Deploy to Vercel
 

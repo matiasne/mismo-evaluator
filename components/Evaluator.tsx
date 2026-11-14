@@ -24,6 +24,8 @@ interface LoadedFile {
   xml: string;
 }
 
+const ALL_SECTIONS = SECTIONS.map((s) => s.key);
+
 async function evaluateSection(xml: string, questions: Question[]): Promise<EvaluateResponse> {
   const response = await fetch("/api/evaluate", {
     method: "POST",
@@ -69,8 +71,9 @@ export function Evaluator() {
     setFile({ name, xml });
   }
 
-  function run(sections: SectionKey[]) {
-    if (!file || !ready) return;
+  // `xml` is passed in when the file was loaded in this same click and is not in state yet.
+  function run(sections: SectionKey[], xml = ready ? file?.xml : undefined) {
+    if (xml === undefined) return;
     const batches = sections
       .map((section) => ({ section, batch: questions.filter((q) => q.section === section && !disabled.has(q.id)) }))
       .filter(({ batch }) => batch.length > 0);
@@ -94,7 +97,7 @@ export function Evaluator() {
         setResults((current) => ({ ...current, ...Object.fromEntries(batch.map((q) => [q.id, resultFor(q)])) }));
 
       settle(() => ({ status: "running" }));
-      evaluateSection(file.xml, batch).then(
+      evaluateSection(xml, batch).then(
         (response) => {
           setModel(response.model);
           finish(response.inputTokens);
@@ -131,8 +134,12 @@ export function Evaluator() {
           running={running}
           lastRun={lastRun}
           onFile={loadFile}
+          onSample={(name, xml) => {
+            loadFile(name, xml);
+            if (parseMismo(xml).ok) run(ALL_SECTIONS, xml);
+          }}
           onError={setFileError}
-          onEvaluate={() => run(SECTIONS.map((s) => s.key))}
+          onEvaluate={() => run(ALL_SECTIONS)}
         />
       </div>
       <div>

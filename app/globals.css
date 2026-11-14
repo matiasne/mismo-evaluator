@@ -90,6 +90,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn.small { padding: 3px 8px; font-size: 13px; }
 .btn.link { border: 0; background: none; color: var(--link); padding: 0; }
 
+.spinner {
+  display: inline-block; width: 0.85em; height: 0.85em; margin-right: 0.45em; vertical-align: -0.08em;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.stat-value .spinner { margin-right: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.5s; } }
+
 .alert { border-radius: 8px; padding: 10px 12px; margin-top: 12px; background: var(--fail-soft); color: var(--fail); overflow-wrap: anywhere; }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }

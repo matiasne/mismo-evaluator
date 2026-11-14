@@ -109,6 +109,7 @@ export function ResultsPanel(props: Props) {
                     ),
                 )}
                 <button className="btn small" disabled={!canRun || busy} onClick={() => props.onRunSection(section.key)}>
+                  {busy && <span className="spinner" aria-hidden="true" />}
                   {busy ? "Running…" : "Run"}
                 </button>
               </div>
@@ -130,6 +131,7 @@ export function ResultsPanel(props: Props) {
                         <span className={`badge ${verdict}`}>{VERDICT_LABEL[verdict]}</span>
                       ) : (
                         <span className="badge idle">
+                          {!off && result?.status === "running" && <span className="spinner" aria-hidden="true" />}
                           {off ? "Off" : result?.status === "running" ? "Running" : result?.status === "error" ? "Error" : "Not run"}
                         </span>
                       )}

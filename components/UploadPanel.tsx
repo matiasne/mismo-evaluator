@@ -12,6 +12,8 @@ interface Props {
   running: boolean;
   lastRun: RunStats | null;
   onFile: (name: string, xml: string) => void;
+  /** Loads the sample and evaluates it straight away. */
+  onSample: (name: string, xml: string) => void;
   onError: (message: string) => void;
   onEvaluate: () => void;
 }
@@ -25,7 +27,7 @@ const money = (value: string | null) => {
     : (value ?? "Not stated");
 };
 
-export function UploadPanel({ fileName, parsed, error, running, lastRun, onFile, onError, onEvaluate }: Props) {
+export function UploadPanel({ fileName, parsed, error, running, lastRun, onFile, onSample, onError, onEvaluate }: Props) {
   const [over, setOver] = useState(false);
 
   async function read(file: File | undefined) {
@@ -41,7 +43,7 @@ export function UploadPanel({ fileName, parsed, error, running, lastRun, onFile,
     try {
       const response = await fetch(SAMPLE);
       if (!response.ok) throw new Error();
-      onFile("sample-urla.xml", await response.text());
+      onSample("sample-urla.xml", await response.text());
     } catch {
       onError("The sample file could not be loaded.");
     }
@@ -82,9 +84,10 @@ export function UploadPanel({ fileName, parsed, error, running, lastRun, onFile,
 
         <div className="row-actions">
           <button className="btn primary" disabled={!parsed?.ok || running} onClick={onEvaluate}>
+            {running && <span className="spinner" aria-hidden="true" />}
             {running ? "Evaluating…" : "Evaluate with Jev"}
           </button>
-          <button className="btn" onClick={() => void loadSample()}>Try the sample</button>
+          <button className="btn" disabled={running} onClick={() => void loadSample()}>Try the sample</button>
         </div>
         <p className="muted small" style={{ marginTop: 10 }}>
           The file is not stored. SSNs are masked before the data is sent to Jev.
@@ -95,13 +98,19 @@ export function UploadPanel({ fileName, parsed, error, running, lastRun, onFile,
         <div className="stats" aria-live="polite">
           <section className="panel stat">
             <h2>Time</h2>
-            <p className="stat-value">{lastRun.ms === null ? "…" : formatDuration(lastRun.ms)}</p>
+            <p className="stat-value">{lastRun.ms === null ? <span className="spinner" aria-hidden="true" /> : formatDuration(lastRun.ms)}</p>
             <p className="muted small">{lastRun.ms === null ? "Evaluating" : "Last run"}</p>
           </section>
           <section className="panel stat">
             <h2>Cost</h2>
             <p className="stat-value">
-              {lastRun.ms === null ? "…" : lastRun.inputTokens === null ? "Not reported" : formatUsd(lastRun.inputTokens)}
+              {lastRun.ms === null ? (
+                <span className="spinner" aria-hidden="true" />
+              ) : lastRun.inputTokens === null ? (
+                "Not reported"
+              ) : (
+                formatUsd(lastRun.inputTokens)
+              )}
             </p>
             <p className="muted small">
               {lastRun.ms === null || lastRun.inputTokens === null ? "Input tokens" : formatTokens(lastRun.inputTokens)}
