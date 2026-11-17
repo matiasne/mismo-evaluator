@@ -47,6 +47,20 @@ describe("parseMismo", () => {
     expect(JSON.stringify(parsed.state)).toContain('"02134"');
   });
 
+  it("accepts a MESSAGE wrapped in an envelope, such as a Freddie Mac LPA request", () => {
+    const parsed = parseMismo(
+      `<lparqst:LPALoanAssessmentServiceRequest xmlns="http://www.mismo.org/residential/2009/schemas" xmlns:lparqst="http://www.freddiemac.com/lpa/LPALoanAssessmentService/schemas">
+        <MESSAGE MISMOReferenceModelIdentifier="3.4.032420160128"><DEAL_SETS><DEAL_SET><DEALS><DEAL>
+          <LOANS><LOAN LoanRoleType="SubjectLoan"><TERMS_OF_LOAN><BaseLoanAmount>100000</BaseLoanAmount><LoanPurposeType>Purchase</LoanPurposeType></TERMS_OF_LOAN></LOAN></LOANS>
+          <PARTIES><PARTY><INDIVIDUAL><NAME><FirstName>Alice</FirstName><LastName>Firstimer</LastName></NAME></INDIVIDUAL><ROLES><ROLE><BORROWER/></ROLE></ROLES></PARTY></PARTIES>
+        </DEAL></DEALS></DEAL_SET></DEAL_SETS></MESSAGE>
+      </lparqst:LPALoanAssessmentServiceRequest>`,
+    );
+    if (!parsed.ok) throw new Error(parsed.error);
+    expect(parsed.summary).toMatchObject({ version: "3.4.032420160128", borrowers: ["Alice Firstimer"], loanPurpose: "Purchase", noteAmount: "100000" });
+    expect(JSON.stringify(parsed.state)).not.toContain("LPALoanAssessmentServiceRequest");
+  });
+
   it("rejects files that are not MISMO loan applications", () => {
     expect(parseMismo("")).toMatchObject({ ok: false });
     expect(parseMismo("<MESSAGE><DEAL></MESSAGE>")).toMatchObject({ ok: false, error: expect.stringContaining("well-formed") });

@@ -121,9 +121,10 @@ export function parseMismo(xml: string): ParseResult {
   }
 
   const document = parser.parse(xml) as JsonObject;
-  const message = document.MESSAGE;
-  if (!isObject(message)) {
-    return { ok: false, error: "This XML is not a MISMO file: the root element must be MESSAGE." };
+  // AUS requests (Freddie Mac LPA, for one) wrap the MESSAGE in an envelope element.
+  const message = findAll(document, "MESSAGE").find(isObject);
+  if (!message) {
+    return { ok: false, error: "This XML is not a MISMO file: it has no MESSAGE element." };
   }
   if (findAll(message, "DEAL").length === 0) {
     return { ok: false, error: "This MISMO file has no DEAL, so there is no loan application to evaluate." };
