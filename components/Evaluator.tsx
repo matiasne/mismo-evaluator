@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MAX_XML_BYTES, parseMismo } from "@/lib/mismo/parse";
 import { DEFAULT_QUESTIONS, SECTIONS, type Answer, type EvaluateResponse, type Question, type SectionKey } from "@/lib/questions";
 import { useSavedQuestions } from "@/lib/questionStore";
+import { toSummaryCheck, type SummaryResponse } from "@/lib/summary";
 import { QuestionForm } from "./QuestionForm";
 import { ResultsPanel } from "./ResultsPanel";
+import { SummaryPanel, type Summary } from "./SummaryPanel";
 import { UploadPanel } from "./UploadPanel";
 
 export type Result =
@@ -37,6 +39,13 @@ async function evaluateSection(xml: string, questions: Question[]): Promise<Eval
   return body as EvaluateResponse;
 }
 
+async function summarize(body: string, signal: AbortSignal): Promise<SummaryResponse> {
+  const response = await fetch("/api/summary", { method: "POST", headers: { "Content-Type": "application/json" }, body, signal });
+  const json = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(json?.error ?? `The summary failed (${response.status}).`);
+  return json as SummaryResponse;
+}
+
 export function Evaluator() {
   const { saved, upsertCustom, removeCustom, setEnabled } = useSavedQuestions();
   const [file, setFile] = useState<LoadedFile | null>(null);
@@ -55,6 +64,36 @@ export function Evaluator() {
   const disabled = useMemo(() => new Set(saved.disabled), [saved.disabled]);
   const ready = parsed?.ok === true;
   const running = Object.values(results).some((result) => result.status === "running");
+
+  // The summary request for the answers on screen, or null while a run is going or nothing is answered.
+  const summaryBody = useMemo(() => {
+    if (running) return null;
+    const checks = questions.flatMap((question) => {
+      const result = results[question.id];
+      return result?.status === "done" ? toSummaryCheck(question, result.answer) : [];
+    });
+    return checks.length > 0 ? JSON.stringify({ checks }) : null;
+  }, [running, questions, results]);
+  // Kept with the request it answers, so a summary of older results is never shown as current.
+  const [summarized, setSummarized] = useState<{ body: string; summary: Summary } | null>(null);
+  const summary: Summary | null =
+    summaryBody === null ? null : summarized?.body === summaryBody ? summarized.summary : { status: "loading" };
+
+  useEffect(() => {
+    if (summaryBody === null) return;
+    const controller = new AbortController();
+    const startedAt = performance.now();
+    summarize(summaryBody, controller.signal).then(
+      ({ summary: text, inputTokens, outputTokens }) =>
+        setSummarized({ body: summaryBody, summary: { status: "done", text, ms: performance.now() - startedAt, inputTokens, outputTokens } }),
+      (cause: unknown) => {
+        if (controller.signal.aborted) return;
+        const message = cause instanceof Error ? cause.message : "The summary failed.";
+        setSummarized({ body: summaryBody, summary: { status: "error", message } });
+      },
+    );
+    return () => controller.abort();
+  }, [summaryBody]);
 
   function loadFile(name: string, xml: string) {
     setResults({});
@@ -141,6 +180,7 @@ export function Evaluator() {
           onError={setFileError}
           onEvaluate={() => run(ALL_SECTIONS)}
         />
+        {summary && <SummaryPanel summary={summary} />}
       </div>
       <div>
         {editing !== undefined && (

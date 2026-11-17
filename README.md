@@ -8,7 +8,7 @@ Needs Node.js 22 or newer and a TypeSafe API key.
 
 ```sh
 npm install
-cp .env.example .env.local   # then set TYPESAFE_API_KEY
+cp .env.example .env.local   # then set TYPESAFE_API_KEY and ANTHROPIC_API_KEY
 npm run dev                  # http://localhost:3000
 ```
 
@@ -16,7 +16,7 @@ npm run dev                  # http://localhost:3000
 
 ## Deploy to Vercel
 
-Import the repository in Vercel (or run `vercel`), and set the `TYPESAFE_API_KEY` environment variable. Optionally set `JEV_MODEL` (defaults to `jev-latest`). No other configuration is needed.
+Import the repository in Vercel (or run `vercel`), and set the `TYPESAFE_API_KEY` environment variable, and `ANTHROPIC_API_KEY` for the results summary. Optionally set `JEV_MODEL` (defaults to `jev-latest`). No other configuration is needed.
 
 ## How it works
 
