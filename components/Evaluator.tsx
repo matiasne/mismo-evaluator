@@ -84,8 +84,8 @@ export function Evaluator() {
     const controller = new AbortController();
     const startedAt = performance.now();
     summarize(summaryBody, controller.signal).then(
-      ({ summary: text, inputTokens, outputTokens }) =>
-        setSummarized({ body: summaryBody, summary: { status: "done", text, ms: performance.now() - startedAt, inputTokens, outputTokens } }),
+      ({ summary: text, model, inputTokens, outputTokens }) =>
+        setSummarized({ body: summaryBody, summary: { status: "done", text, model, ms: performance.now() - startedAt, inputTokens, outputTokens } }),
       (cause: unknown) => {
         if (controller.signal.aborted) return;
         const message = cause instanceof Error ? cause.message : "The summary failed.";

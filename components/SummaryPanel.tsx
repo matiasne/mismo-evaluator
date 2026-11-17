@@ -2,7 +2,7 @@ import { formatDuration, formatUsdAmount, summaryCostUsd } from "@/lib/cost";
 
 export type Summary =
   | { status: "loading" }
-  | { status: "done"; text: string; ms: number; inputTokens: number; outputTokens: number }
+  | { status: "done"; text: string; model: string; ms: number; inputTokens: number; outputTokens: number }
   | { status: "error"; message: string };
 
 const tokens = (count: number) => count.toLocaleString("en-US");
@@ -43,7 +43,7 @@ export function SummaryPanel({ summary }: { summary: Summary }) {
         </div>
       )}
       <p className="muted small" style={{ marginTop: 10 }}>
-        Written by Claude from the results. The file itself is not sent to Claude.
+        Written by {summary.status === "done" ? <strong>{summary.model}</strong> : "Claude"} from the results. The file itself is not sent to Claude.
       </p>
     </section>
   );

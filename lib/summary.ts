@@ -16,6 +16,8 @@ export const summaryRequestSchema = z.object({ checks: z.array(checkSchema).min(
 
 export interface SummaryResponse {
   summary: string;
+  /** The Claude model that wrote it, as the API reports it. */
+  model: string;
   /** Tokens Claude billed for this request. Output includes the model's thinking. */
   inputTokens: number;
   outputTokens: number;
