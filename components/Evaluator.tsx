@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ENGINES, engineLabel, formatDuration, formatUsdAmount, costUsd, type Engine, type Tokens } from "@/lib/cost";
 import { MAX_XML_BYTES, parseMismo } from "@/lib/mismo/parse";
 import { DEFAULT_QUESTIONS, SECTIONS, type Answer, type EvaluateResponse, type Question, type SectionKey } from "@/lib/questions";
 import { useSavedQuestions } from "@/lib/questionStore";
@@ -15,10 +16,19 @@ export type Result =
   | { status: "done"; answer: Answer }
   | { status: "error"; message: string };
 
-/** Time and tokens of one run. `ms` is null while it is still running. */
+/** Time and tokens of one run. `ms` is null while it is still running; `tokens` is null when the API did not report them. */
 export interface RunStats {
   ms: number | null;
-  inputTokens: number | null;
+  tokens: Tokens | null;
+}
+
+/** Everything one engine has produced for the file on screen. */
+interface EngineState {
+  results: Record<string, Result>;
+  model: string | null;
+  sectionStats: Partial<Record<SectionKey, RunStats>>;
+  // The last run is everything one click started: the whole file, or a single section.
+  lastRun: RunStats | null;
 }
 
 interface LoadedFile {
@@ -27,9 +37,14 @@ interface LoadedFile {
 }
 
 const ALL_SECTIONS = SECTIONS.map((s) => s.key);
+const ALL_ENGINES = ENGINES.map((e) => e.key);
+const ENDPOINT: Record<Engine, string> = { jev: "/api/evaluate", opus: "/api/evaluate-opus" };
+const NOT_RUN: EngineState = { results: {}, model: null, sectionStats: {}, lastRun: null };
 
-async function evaluateSection(xml: string, questions: Question[]): Promise<EvaluateResponse> {
-  const response = await fetch("/api/evaluate", {
+const isRunning = (state: EngineState) => Object.values(state.results).some((result) => result.status === "running");
+
+async function evaluateSection(engine: Engine, xml: string, questions: Question[]): Promise<EvaluateResponse> {
+  const response = await fetch(ENDPOINT[engine], {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ xml, questions }),
@@ -50,30 +65,32 @@ export function Evaluator() {
   const { saved, upsertCustom, removeCustom, setEnabled } = useSavedQuestions();
   const [file, setFile] = useState<LoadedFile | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, Result>>({});
-  const [model, setModel] = useState<string | null>(null);
+  const [engines, setEngines] = useState<Record<Engine, EngineState>>({ jev: NOT_RUN, opus: NOT_RUN });
+  // The engine whose results are on screen.
+  const [tab, setTab] = useState<Engine>("jev");
+  const runId = useRef<Record<Engine, number>>({ jev: 0, opus: 0 });
   // `undefined`: form closed. `null`: adding a new question.
-  const [sectionStats, setSectionStats] = useState<Partial<Record<SectionKey, RunStats>>>({});
-  // The last run is everything one click started: the whole file, or a single section.
-  const [lastRun, setLastRun] = useState<RunStats | null>(null);
-  const runId = useRef(0);
   const [editing, setEditing] = useState<Question | null | undefined>(undefined);
 
   const parsed = useMemo(() => (file ? parseMismo(file.xml) : null), [file]);
   const questions = useMemo(() => [...DEFAULT_QUESTIONS, ...saved.custom], [saved.custom]);
   const disabled = useMemo(() => new Set(saved.disabled), [saved.disabled]);
   const ready = parsed?.ok === true;
-  const running = Object.values(results).some((result) => result.status === "running");
+  const running = isRunning(engines.jev) || isRunning(engines.opus);
+  const shown = engines[tab];
+  const other: Engine = tab === "jev" ? "opus" : "jev";
 
-  // The summary request for the answers on screen, or null while a run is going or nothing is answered.
+  // The summary is written from Jev's answers: null while Jev is running or has answered nothing.
+  const { results } = engines.jev;
+  const jevRunning = isRunning(engines.jev);
   const summaryBody = useMemo(() => {
-    if (running) return null;
+    if (jevRunning) return null;
     const checks = questions.flatMap((question) => {
       const result = results[question.id];
       return result?.status === "done" ? toSummaryCheck(question, result.answer) : [];
     });
     return checks.length > 0 ? JSON.stringify({ checks }) : null;
-  }, [running, questions, results]);
+  }, [jevRunning, questions, results]);
   // Kept with the request it answers, so a summary of older results is never shown as current.
   const [summarized, setSummarized] = useState<{ body: string; summary: Summary } | null>(null);
   const summary: Summary | null =
@@ -96,11 +113,8 @@ export function Evaluator() {
   }, [summaryBody]);
 
   function loadFile(name: string, xml: string) {
-    setResults({});
-    setModel(null);
-    setSectionStats({});
-    setLastRun(null);
-    runId.current += 1;
+    setEngines({ jev: NOT_RUN, opus: NOT_RUN });
+    for (const engine of ALL_ENGINES) runId.current[engine] += 1;
     if (new Blob([xml]).size > MAX_XML_BYTES) {
       setFile(null);
       setFileError("The file is larger than 4 MB.");
@@ -111,56 +125,75 @@ export function Evaluator() {
   }
 
   // `xml` is passed in when the file was loaded in this same click and is not in state yet.
-  function run(sections: SectionKey[], xml = ready ? file?.xml : undefined) {
+  function run(engine: Engine, sections: SectionKey[], xml = ready ? file?.xml : undefined) {
     if (xml === undefined) return;
     const batches = sections
       .map((section) => ({ section, batch: questions.filter((q) => q.section === section && !disabled.has(q.id)) }))
       .filter(({ batch }) => batch.length > 0);
     if (batches.length === 0) return;
 
-    const id = (runId.current += 1);
+    const id = (runId.current[engine] += 1);
     const startedAt = performance.now();
     let pending = batches.length;
-    let runTokens: number | null = 0;
-    setLastRun({ ms: null, inputTokens: null });
+    let runTokens: Tokens | null = { inputTokens: 0, outputTokens: 0 };
+    const update = (change: (state: EngineState) => EngineState) =>
+      setEngines((current) => ({ ...current, [engine]: change(current[engine]) }));
+    update((state) => ({ ...state, lastRun: { ms: null, tokens: null } }));
 
     for (const { section, batch } of batches) {
-      const finish = (inputTokens: number | null) => {
-        setSectionStats((current) => ({ ...current, [section]: { ms: performance.now() - startedAt, inputTokens } }));
-        runTokens = runTokens === null || inputTokens === null ? null : runTokens + inputTokens;
+      // Sets the section's results and stats together, and the run's stats once its last section is in.
+      const settle = (resultFor: (question: Question) => Result, tokens: Tokens | null, model?: string) => {
+        const ms = performance.now() - startedAt;
+        runTokens =
+          runTokens === null || tokens === null
+            ? null
+            : { inputTokens: runTokens.inputTokens + tokens.inputTokens, outputTokens: runTokens.outputTokens + tokens.outputTokens };
         pending -= 1;
         // A newer run, or a new file, owns the header by now.
-        if (pending === 0 && runId.current === id) setLastRun({ ms: performance.now() - startedAt, inputTokens: runTokens });
+        const lastRun = pending === 0 && runId.current[engine] === id ? { ms, tokens: runTokens } : null;
+        update((state) => ({
+          results: { ...state.results, ...Object.fromEntries(batch.map((q) => [q.id, resultFor(q)])) },
+          model: model ?? state.model,
+          sectionStats: { ...state.sectionStats, [section]: { ms, tokens } },
+          lastRun: lastRun ?? state.lastRun,
+        }));
       };
-      const settle = (resultFor: (question: Question) => Result) =>
-        setResults((current) => ({ ...current, ...Object.fromEntries(batch.map((q) => [q.id, resultFor(q)])) }));
 
-      settle(() => ({ status: "running" }));
-      evaluateSection(xml, batch).then(
-        (response) => {
-          setModel(response.model);
-          finish(response.inputTokens);
-          settle((q) => {
-            const answer = response.answers[q.id];
-            return answer ? { status: "done", answer } : { status: "error", message: "Jev returned no answer for this question." };
-          });
-        },
+      update((state) => ({
+        ...state,
+        results: { ...state.results, ...Object.fromEntries(batch.map((q) => [q.id, { status: "running" }])) },
+      }));
+      evaluateSection(engine, xml, batch).then(
+        (response) =>
+          settle(
+            (q) => {
+              const answer = response.answers[q.id];
+              return answer ? { status: "done", answer } : { status: "error", message: `${engineLabel(engine)} returned no answer for this question.` };
+            },
+            response.tokens,
+            response.model,
+          ),
         (cause: unknown) => {
           const message = cause instanceof Error ? cause.message : "The evaluation failed.";
-          settle(() => ({ status: "error", message }));
           // A failed section is not billed, so it adds nothing to the run's cost.
-          finish(0);
+          settle(() => ({ status: "error", message }), { inputTokens: 0, outputTokens: 0 });
         },
       );
     }
   }
 
+  // One click evaluates the file with both engines, so their time and cost can be compared.
+  function runAll(xml?: string) {
+    for (const engine of ALL_ENGINES) run(engine, ALL_SECTIONS, xml);
+  }
+
   function forget(id: string) {
-    setResults((current) => {
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
+    const without = (state: EngineState): EngineState => {
+      const results = { ...state.results };
+      delete results[id];
+      return { ...state, results };
+    };
+    setEngines((current) => ({ jev: without(current.jev), opus: without(current.opus) }));
   }
 
   return (
@@ -171,14 +204,15 @@ export function Evaluator() {
           parsed={parsed}
           error={fileError}
           running={running}
-          lastRun={lastRun}
+          engine={tab}
+          lastRun={shown.lastRun}
           onFile={loadFile}
           onSample={(name, xml) => {
             loadFile(name, xml);
-            if (parseMismo(xml).ok) run(ALL_SECTIONS, xml);
+            if (parseMismo(xml).ok) runAll(xml);
           }}
           onError={setFileError}
-          onEvaluate={() => run(ALL_SECTIONS)}
+          onEvaluate={() => runAll()}
         />
         {summary && <SummaryPanel summary={summary} />}
       </div>
@@ -195,14 +229,38 @@ export function Evaluator() {
             }}
           />
         )}
+        <div className="tabs" role="tablist" aria-label="Evaluated with">
+          {ENGINES.map(({ key, label }) => {
+            const { lastRun } = engines[key];
+            return (
+              <button key={key} className="tab" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}>
+                <strong>{label}</strong>
+                <span className="muted small">
+                  {lastRun === null ? (
+                    "Not run"
+                  ) : lastRun.ms === null ? (
+                    <>
+                      <span className="spinner" aria-hidden="true" />
+                      Evaluating
+                    </>
+                  ) : (
+                    `${formatDuration(lastRun.ms)} · ${lastRun.tokens ? formatUsdAmount(costUsd(key, lastRun.tokens)) : "cost not reported"}`
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
         <ResultsPanel
+          engine={tab}
           questions={questions}
           disabled={disabled}
-          results={results}
-          model={model}
-          sectionStats={sectionStats}
+          results={shown.results}
+          compare={{ engine: other, results: engines[other].results }}
+          model={shown.model}
+          sectionStats={shown.sectionStats}
           canRun={ready}
-          onRunSection={(section) => run([section])}
+          onRunSection={(section) => run(tab, [section])}
           onToggle={(id, enabled) => {
             setEnabled(id, enabled);
             if (!enabled) forget(id);

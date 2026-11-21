@@ -43,5 +43,7 @@ export async function evaluateWithJev(state: Json, approxTokens: number, questio
       };
     }
   }
-  return { model: result.model, answers, inputTokens: result.usage?.input_tokens ?? null };
+  // Jev does not bill output tokens.
+  const inputTokens = result.usage?.input_tokens ?? null;
+  return { model: result.model, answers, tokens: inputTokens === null ? null : { inputTokens, outputTokens: 0 } };
 }

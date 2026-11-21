@@ -1,15 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { formatCost, formatDuration } from "@/lib/cost";
+import { engineLabel, formatCost, formatDuration, type Engine } from "@/lib/cost";
 import { SECTIONS, type Answer, type Question, type SectionKey } from "@/lib/questions";
 import { countVerdicts, verdictFor, type Verdict } from "@/lib/verdict";
 import type { Result, RunStats } from "./Evaluator";
 
 interface Props {
+  /** The engine these results come from. */
+  engine: Engine;
   questions: Question[];
   disabled: Set<string>;
   results: Record<string, Result>;
+  /** The other engine's results, to point out where the two disagree. */
+  compare: { engine: Engine; results: Record<string, Result> };
   model: string | null;
   sectionStats: Partial<Record<SectionKey, RunStats>>;
   canRun: boolean;
@@ -54,13 +58,21 @@ function AnswerLine({ answer }: { answer: Answer }) {
 }
 
 export function ResultsPanel(props: Props) {
-  const { questions, disabled, results, model, sectionStats, canRun } = props;
+  const { engine, questions, disabled, results, compare, model, sectionStats, canRun } = props;
   const [filter, setFilter] = useState<Verdict | "all">("all");
 
-  const verdictOf = (question: Question): Verdict | null => {
-    const result = results[question.id];
+  const verdictIn = (from: Record<string, Result>, question: Question): Verdict | null => {
+    const result = from[question.id];
     return result?.status === "done" ? verdictFor(question, result.answer) : null;
   };
+  const verdictOf = (question: Question) => verdictIn(results, question);
+  // The other engine's verdict, when both answered and they disagree.
+  const otherVerdictOf = (question: Question): Verdict | null => {
+    const mine = verdictOf(question);
+    const theirs = verdictIn(compare.results, question);
+    return mine !== null && theirs !== null && mine !== theirs ? theirs : null;
+  };
+  const differing = questions.filter((q) => otherVerdictOf(q) !== null).length;
   const totals = countVerdicts(questions.flatMap((q) => verdictOf(q) ?? []));
   const answered = totals.pass + totals.review + totals.fail + totals.info;
 
@@ -72,8 +84,9 @@ export function ResultsPanel(props: Props) {
             <h2 style={{ margin: 0 }}>Results</h2>
             <p className="muted small">
               {answered === 0
-                ? "Upload a file and evaluate it to see Jev's answer to each question."
+                ? `Upload a file and evaluate it to see ${engineLabel(engine)}'s answer to each question.`
                 : `${totals.pass} passed, ${totals.review} to review, ${totals.fail} failed${model ? ` · ${model}` : ""}`}
+              {differing > 0 && ` · ${differing} differ from ${engineLabel(compare.engine)}`}
             </p>
           </div>
           <button className="btn" onClick={props.onAdd}>Add question</button>
@@ -116,13 +129,14 @@ export function ResultsPanel(props: Props) {
             </div>
             {stats?.ms != null && !busy && (
               <p className="muted small">
-                {formatDuration(stats.ms)} · {formatCost(stats.inputTokens)}
+                {formatDuration(stats.ms)} · {formatCost(engine, stats.tokens)}
               </p>
             )}
             <ul className="questions">
               {shown.map((question) => {
                 const result = results[question.id];
                 const verdict = verdictOf(question);
+                const otherVerdict = otherVerdictOf(question);
                 const off = disabled.has(question.id);
                 return (
                   <li key={question.id} className={off ? "question off" : "question"}>
@@ -158,6 +172,11 @@ export function ResultsPanel(props: Props) {
                     {result?.status === "done" && (
                       <span className="question-answer">
                         <AnswerLine answer={result.answer} />
+                        {otherVerdict && (
+                          <span className={`badge ${otherVerdict}`}>
+                            {engineLabel(compare.engine)}: {VERDICT_LABEL[otherVerdict]}
+                          </span>
+                        )}
                       </span>
                     )}
                     {result?.status === "error" && <span className="question-answer">{result.message}</span>}
