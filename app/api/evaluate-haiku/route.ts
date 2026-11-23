@@ -1,11 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { MAX_XML_BYTES, parseMismo } from "@/lib/mismo/parse";
-import { evaluateWithOpus } from "@/lib/opus";
+import { evaluateWithHaiku } from "@/lib/haiku";
 import { evaluateRequestSchema } from "@/lib/questions";
 
 export const runtime = "nodejs";
-// Opus thinks before it answers, so a section can take much longer than it does with Jev.
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 const error = (message: string, status: number) => Response.json({ error: message }, { status });
 
@@ -22,13 +21,13 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.ok) return error(parsed.error, 422);
 
   try {
-    return Response.json(await evaluateWithOpus(parsed.state, body.data.questions));
+    return Response.json(await evaluateWithHaiku(parsed.state, body.data.questions));
   } catch (cause) {
     if (cause instanceof Anthropic.AuthenticationError) return error("Anthropic rejected the API key.", 502);
     if (cause instanceof Anthropic.RateLimitError) return error("Anthropic is rate limiting requests. Try again in a moment.", 429);
     // A connection error is also an APIError, so it has to be checked first.
     if (cause instanceof Anthropic.APIConnectionError) return error("Could not reach Anthropic. Try again.", 504);
-    if (cause instanceof Anthropic.APIError) return error(`Opus could not evaluate this section (${cause.status}): ${cause.message}`, 502);
+    if (cause instanceof Anthropic.APIError) return error(`Haiku could not evaluate this section (${cause.status}): ${cause.message}`, 502);
     throw cause;
   }
 }

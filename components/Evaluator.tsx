@@ -38,7 +38,7 @@ interface LoadedFile {
 
 const ALL_SECTIONS = SECTIONS.map((s) => s.key);
 const ALL_ENGINES = ENGINES.map((e) => e.key);
-const ENDPOINT: Record<Engine, string> = { jev: "/api/evaluate", opus: "/api/evaluate-opus" };
+const ENDPOINT: Record<Engine, string> = { jev: "/api/evaluate", haiku: "/api/evaluate-haiku" };
 const NOT_RUN: EngineState = { results: {}, model: null, sectionStats: {}, lastRun: null };
 
 const isRunning = (state: EngineState) => Object.values(state.results).some((result) => result.status === "running");
@@ -65,10 +65,10 @@ export function Evaluator() {
   const { saved, upsertCustom, removeCustom, setEnabled } = useSavedQuestions();
   const [file, setFile] = useState<LoadedFile | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [engines, setEngines] = useState<Record<Engine, EngineState>>({ jev: NOT_RUN, opus: NOT_RUN });
+  const [engines, setEngines] = useState<Record<Engine, EngineState>>({ jev: NOT_RUN, haiku: NOT_RUN });
   // The engine whose results are on screen.
   const [tab, setTab] = useState<Engine>("jev");
-  const runId = useRef<Record<Engine, number>>({ jev: 0, opus: 0 });
+  const runId = useRef<Record<Engine, number>>({ jev: 0, haiku: 0 });
   // `undefined`: form closed. `null`: adding a new question.
   const [editing, setEditing] = useState<Question | null | undefined>(undefined);
 
@@ -76,9 +76,9 @@ export function Evaluator() {
   const questions = useMemo(() => [...DEFAULT_QUESTIONS, ...saved.custom], [saved.custom]);
   const disabled = useMemo(() => new Set(saved.disabled), [saved.disabled]);
   const ready = parsed?.ok === true;
-  const running = isRunning(engines.jev) || isRunning(engines.opus);
+  const running = isRunning(engines.jev) || isRunning(engines.haiku);
   const shown = engines[tab];
-  const other: Engine = tab === "jev" ? "opus" : "jev";
+  const other: Engine = tab === "jev" ? "haiku" : "jev";
 
   // The summary is written from Jev's answers: null while Jev is running or has answered nothing.
   const { results } = engines.jev;
@@ -113,7 +113,7 @@ export function Evaluator() {
   }, [summaryBody]);
 
   function loadFile(name: string, xml: string) {
-    setEngines({ jev: NOT_RUN, opus: NOT_RUN });
+    setEngines({ jev: NOT_RUN, haiku: NOT_RUN });
     for (const engine of ALL_ENGINES) runId.current[engine] += 1;
     if (new Blob([xml]).size > MAX_XML_BYTES) {
       setFile(null);
@@ -193,7 +193,7 @@ export function Evaluator() {
       delete results[id];
       return { ...state, results };
     };
-    setEngines((current) => ({ jev: without(current.jev), opus: without(current.opus) }));
+    setEngines((current) => ({ jev: without(current.jev), haiku: without(current.haiku) }));
   }
 
   return (

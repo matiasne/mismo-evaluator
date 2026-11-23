@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Json } from "./mismo/parse";
 import type { Answer, EvaluateResponse, Question } from "./questions";
 
-const OPUS_MODEL = "claude-opus-5-5";
+const HAIKU_MODEL = "claude-haiku-5-5";
 
 const SYSTEM = `You check MISMO 3.4 residential loan application files (URLA / Form 1003 data) before they are imported into a loan origination system. A wrong or missing field passes silently to everything downstream, so the point of each check is to catch it here.
 
@@ -30,7 +30,7 @@ const answersSchema = z.object({
   ),
 });
 
-type OpusAnswer = z.infer<typeof answersSchema>["answers"][number];
+type HaikuAnswer = z.infer<typeof answersSchema>["answers"][number];
 
 function toPromptQuestion(question: Question) {
   const { id, kind, text } = question;
@@ -41,8 +41,8 @@ function toPromptQuestion(question: Question) {
 
 const unit = (value: number) => Math.min(1, Math.max(0, value));
 
-/** Opus gives one answer and how sure it is, not a distribution, so the probabilities hold just that answer. */
-function toAnswer(question: Question, answer: OpusAnswer | undefined): Answer | null {
+/** Haiku gives one answer and how sure it is, not a distribution, so the probabilities hold just that answer. */
+function toAnswer(question: Question, answer: HaikuAnswer | undefined): Answer | null {
   if (question.kind === "noul" && answer?.kind === "noul") {
     return { kind: "noul", probability: unit(answer.probability) };
   }
@@ -59,11 +59,11 @@ function toAnswer(question: Question, answer: OpusAnswer | undefined): Answer | 
   return null;
 }
 
-/** Asks Claude Opus the same questions Jev gets, about the same state, and returns answers in the same shape. */
-export async function evaluateWithOpus(state: Json, questions: Question[]): Promise<EvaluateResponse> {
+/** Asks Claude Haiku the same questions Jev gets, about the same state, and returns answers in the same shape. */
+export async function evaluateWithHaiku(state: Json, questions: Question[]): Promise<EvaluateResponse> {
   const client = new Anthropic();
   const response = await client.messages.parse({
-    model: OPUS_MODEL,
+    model: HAIKU_MODEL,
     // Leaves room for the model's thinking, which counts toward this limit.
     max_tokens: 16000,
     output_config: { effort: "medium", format: zodOutputFormat(answersSchema) },

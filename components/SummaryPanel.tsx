@@ -1,4 +1,4 @@
-import { formatDuration, formatUsdAmount, summaryCostUsd } from "@/lib/cost";
+import { costUsd, formatDuration, formatUsdAmount } from "@/lib/cost";
 
 export type Summary =
   | { status: "loading" }
@@ -33,7 +33,7 @@ export function SummaryPanel({ summary }: { summary: Summary }) {
               {summary.status === "loading" ? (
                 <span className="spinner" aria-hidden="true" />
               ) : (
-                formatUsdAmount(summaryCostUsd(summary.inputTokens, summary.outputTokens))
+                formatUsdAmount(costUsd("haiku", summary))
               )}
             </p>
             <p className="muted small">

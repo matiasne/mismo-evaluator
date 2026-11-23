@@ -1,7 +1,7 @@
 /** The two models that can evaluate a file. */
 export const ENGINES = [
   { key: "jev", label: "Jev" },
-  { key: "opus", label: "Claude Opus" },
+  { key: "haiku", label: "Claude Haiku" },
 ] as const;
 
 export type Engine = (typeof ENGINES)[number]["key"];
@@ -17,22 +17,15 @@ export interface Tokens {
 /**
  * List prices in USD per million tokens.
  * Jev bills input only (https://docs.typesafe.ai/models).
- * Opus is Claude Opus 5.5 (https://platform.claude.com/docs/en/about-claude/pricing).
+ * Haiku is Claude Haiku 5.5, for prompts up to 100,000 tokens (https://platform.claude.com/docs/en/about-claude/pricing).
  */
 export const USD_PER_MILLION_TOKENS: Record<Engine, { input: number; output: number }> = {
   jev: { input: 0.042, output: 0 },
-  opus: { input: 4, output: 20 },
+  haiku: { input: 0.1, output: 0.5 },
 };
 
 export const costUsd = (engine: Engine, { inputTokens, outputTokens }: Tokens) =>
   (inputTokens * USD_PER_MILLION_TOKENS[engine].input + outputTokens * USD_PER_MILLION_TOKENS[engine].output) / 1_000_000;
-
-/** Claude Haiku 5.5's list price for prompts up to 100,000 tokens (https://platform.claude.com/docs/en/about-claude/pricing). */
-export const SUMMARY_USD_PER_MILLION_INPUT_TOKENS = 0.1;
-export const SUMMARY_USD_PER_MILLION_OUTPUT_TOKENS = 0.5;
-
-export const summaryCostUsd = (inputTokens: number, outputTokens: number) =>
-  (inputTokens * SUMMARY_USD_PER_MILLION_INPUT_TOKENS + outputTokens * SUMMARY_USD_PER_MILLION_OUTPUT_TOKENS) / 1_000_000;
 
 export function formatUsdAmount(usd: number): string {
   // Evaluations cost fractions of a cent, so keep enough digits to show a real number.

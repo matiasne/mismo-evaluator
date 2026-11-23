@@ -92,7 +92,7 @@ export function UploadPanel({ fileName, parsed, error, running, engine, lastRun,
           <button className="btn" disabled={running} onClick={() => void loadSample()}>Try the sample</button>
         </div>
         <p className="muted small" style={{ marginTop: 10 }}>
-          The file is not stored. SSNs are masked before the data is sent to Jev and Claude Opus.
+          The file is not stored. SSNs are masked before the data is sent to Jev and Claude Haiku.
         </p>
       </section>
 

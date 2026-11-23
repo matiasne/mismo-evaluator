@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { costUsd, formatCost, formatDuration, formatUsdAmount, summaryCostUsd } from "../lib/cost";
+import { costUsd, formatCost, formatDuration, formatUsdAmount } from "../lib/cost";
 
 describe("cost", () => {
   it("prices Jev at $0.042 per million input tokens", () => {
@@ -12,16 +12,11 @@ describe("cost", () => {
     expect(formatCost("jev", null)).toBe("cost not reported");
   });
 
-  it("prices Opus at $4 per million input tokens and $20 per million output tokens", () => {
-    expect(costUsd("opus", { inputTokens: 1_000_000, outputTokens: 0 })).toBeCloseTo(4);
-    expect(costUsd("opus", { inputTokens: 0, outputTokens: 1_000_000 })).toBeCloseTo(20);
-    expect(formatCost("opus", { inputTokens: 60_000, outputTokens: 5_000 })).toBe("$0.340 (60,000 in · 5,000 out)");
-  });
-
-  it("prices the summary at $0.10 per million input tokens and $0.50 per million output tokens", () => {
-    expect(summaryCostUsd(1_000_000, 0)).toBeCloseTo(0.1);
-    expect(summaryCostUsd(0, 1_000_000)).toBeCloseTo(0.5);
-    expect(formatUsdAmount(summaryCostUsd(3_000, 400))).toBe("$0.0005");
+  it("prices Haiku at $0.10 per million input tokens and $0.50 per million output tokens", () => {
+    expect(costUsd("haiku", { inputTokens: 1_000_000, outputTokens: 0 })).toBeCloseTo(0.1);
+    expect(costUsd("haiku", { inputTokens: 0, outputTokens: 1_000_000 })).toBeCloseTo(0.5);
+    expect(formatUsdAmount(costUsd("haiku", { inputTokens: 3_000, outputTokens: 400 }))).toBe("$0.0005");
+    expect(formatCost("haiku", { inputTokens: 60_000, outputTokens: 5_000 })).toBe("$0.0085 (60,000 in · 5,000 out)");
   });
 
   it("formats durations", () => {

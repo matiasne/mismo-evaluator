@@ -16,7 +16,7 @@ npm run dev                  # http://localhost:3000
 
 ## Deploy to Vercel
 
-Import the repository in Vercel (or run `vercel`), and set the `TYPESAFE_API_KEY` environment variable, and `ANTHROPIC_API_KEY` for the results summary and the Claude Opus comparison. Optionally set `JEV_MODEL` (defaults to `jev-latest`). No other configuration is needed.
+Import the repository in Vercel (or run `vercel`), and set the `TYPESAFE_API_KEY` environment variable, and `ANTHROPIC_API_KEY` for the results summary and the Claude Haiku comparison. Optionally set `JEV_MODEL` (defaults to `jev-latest`). No other configuration is needed.
 
 ## How it works
 
@@ -30,12 +30,12 @@ Import the repository in Vercel (or run `vercel`), and set the `TYPESAFE_API_KEY
 
 Two blocks under the upload box show how long the last run took and what it cost. Cost is the reported tokens times the list prices in `lib/cost.ts`; update them if your pricing differs.
 
-## Comparing with Claude Opus
+## Comparing with Claude Haiku
 
 "Evaluate" runs the file through two engines at once, and the two tabs above the results switch between them. Each tab shows that engine's time and cost for the last run.
 
 - **Jev** is the process described above ($0.042 per million input tokens, output free).
-- **Claude Opus** (`lib/opus.ts`, `POST /api/evaluate-opus`) gets the same masked state and the same questions, one request per section, and answers in the same shape, so the same verdict thresholds apply. It is Claude Opus 5.5 at $4 per million input tokens and $20 per million output tokens; output includes the model's thinking.
+- **Claude Haiku** (`lib/haiku.ts`, `POST /api/evaluate-haiku`) gets the same masked state and the same questions, one request per section, and answers in the same shape, so the same verdict thresholds apply. It is Claude Haiku 5.5 at $0.10 per million input tokens and $0.50 per million output tokens; output includes the model's thinking.
 
 Where the two reach different verdicts on a question, the row shows the other engine's verdict. The summary is written from Jev's answers. A section's "Run" button runs only the engine whose tab is open.
 
